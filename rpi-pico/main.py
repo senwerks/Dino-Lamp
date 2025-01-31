@@ -1,5 +1,3 @@
-# Example using PIO to drive a set of WS2812 LEDs.
-
 import array, time
 from machine import Pin
 import rp2
@@ -13,9 +11,8 @@ brightness = 0.1
 BTN_PIN = 20
 button = Pin(BTN_PIN, Pin.IN, Pin.PULL_UP)
 
-# What state is the dino starting in? [sleep, wake, night, day]
-startstate = "sleep"
-currentstate = startstate
+# Dino state system
+currentstate = "sleep"
 states = ["sleep", "wake", "night", "day"]  # Order of rotation
 
 # Assign each layer a specific set of LEDs
@@ -28,7 +25,7 @@ layer_5 = range(36, 45)  # LEDs 37-45
 # List of layers for easy iteration
 layers = [layer_1, layer_2, layer_3, layer_4, layer_5]
 
-# ws2812 Stuff
+# ws2812 Setup
 @rp2.asm_pio(sideset_init=rp2.PIO.OUT_LOW, out_shiftdir=rp2.PIO.SHIFT_LEFT, autopull=True, pull_thresh=24)
 def ws2812():
     T1 = 2
@@ -90,69 +87,65 @@ def wheel(pos):
 
 # Dino Lamp States
 def dino_state(state):
+    global currentstate  # Ensure we're modifying the global variable
+    currentstate = state
     print(f"Dino is now in {state} mode")
 
-    if currentstate == "sleep":
-        # Make all pixels black
-        pixels_fill((0, 0, 0))
+    if state == "sleep":
+        pixels_fill((0, 0, 0))  # All LEDs off
 
-    elif currentstate == "wake":
-        # Start-up Animation
+    elif state == "wake":
+        # Wake-up animation
         for j in range(255):
             for i in range(NUM_LEDS):
                 rc_index = (i * 256 // NUM_LEDS) + j
                 pixels_set(i, wheel(rc_index & 255))
             pixels_show()
+        dino_state("night")  # Transition to night mode
 
-        # Turn Lamp on to Night Mode
-        dino_state("night")
-
-    elif currentstate == "night":
+    elif state == "night":
         layer_colors = [
-            (255, 0, 0),  # Red for Layer 1
-            (0, 128, 0),  # Dark Green for Layer 2
-            (0, 0, 255),  # Blue for Layer 3
-            (255, 0, 255),  # Purple for Layer 4
-            (255, 255, 255)  # Purple for layer 5
+            (255, 0, 0),  # Red
+            (0, 128, 0),  # Dark Green
+            (0, 0, 255),  # Blue
+            (255, 0, 255),  # Purple
+            (255, 255, 255)  # White
         ]
         for layer_index, layer in enumerate(layers):
             for led in layer:
                 pixels_set(led, layer_colors[layer_index])
         pixels_show()
 
-    elif currentstate == "day":
+    elif state == "day":
         layer_colors = [
-            (255, 128, 0),  # Yellow for layer 1
-            (0, 255, 0),  # Green for layer 2
-            (0, 153, 0),  # Blue/Green for layer 3
-            (102, 255, 255),  # Light Blue for layer 4
-            (255, 0, 0)  # Purple for layer 5
+            (255, 128, 0),  # Orange
+            (0, 255, 0),  # Green
+            (0, 153, 0),  # Teal
+            (102, 255, 255),  # Light Blue
+            (255, 0, 0)  # Red
         ]
         for layer_index, layer in enumerate(layers):
             for led in layer:
                 pixels_set(led, layer_colors[layer_index])
         pixels_show()
-
-
-    else:
-        print("Unknown state")
-        dino_state("wake")
-
 
 # Button Handling
-def check_button(currentstate):
+def check_button():
+    global currentstate  # Ensure we're modifying the global variable
+
     if button.value() == 0:  # Button is pressed (active-low)
         time.sleep(0.2)  # Debounce delay
         if button.value() == 0:  # Confirm it's still pressed
-            print("Button was pressed, switching state")
+            print("Button pressed, switching state...")
             current_index = states.index(currentstate)
-            print("current_index is: ", current_index)
             next_index = (current_index + 1) % len(states)
-            currentstate = states[next_index]
-            print("Switching to ", currentstate)
-            dino_state(currentstate)
+            new_state = states[next_index]
+            print(f"Switching to {new_state}")
+            dino_state(new_state)
+
+            # Wait for button to be released (debouncing)
             while button.value() == 0:
-                time.sleep(0.1)  # Wait for release
+                time.sleep(0.1)
 
 #### End Functions
 
@@ -165,5 +158,5 @@ while True:
     # TODO: Make it change mode based on if the room is dark/light using a flux sensor
     # TODO: Make a button to cycle between sleep/wake/day/night states
 
-    check_button(currentstate)  # Check if button is pressed to change state
+    check_button()  # Check if button is pressed to change state
     time.sleep(0.1)  # Small delay to avoid CPU overuse

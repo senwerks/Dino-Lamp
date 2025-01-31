@@ -8,7 +8,7 @@ PIN_NUM = 22
 brightness = 0.1
 
 # Configure the physical button
-BTN_PIN = 20
+BTN_PIN = 18
 button = Pin(BTN_PIN, Pin.IN, Pin.PULL_UP)
 
 # Dino state system
